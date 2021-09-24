@@ -23,7 +23,12 @@ class DropBoxController {
 
             this.snackModalEl.style.display = 'block';
             
-        })
+        });
+    }
+
+    uploadTask(files){
+
+        let promise
     }
 
 }
