@@ -1,5 +1,4 @@
 //const { response } = require("express");
-// import { Firebase } from "./../util/Firebase";
 class DropBoxController {
 
     constructor (){
@@ -11,18 +10,27 @@ class DropBoxController {
         this.namefileEl = this.snackModalEl.querySelector('.filename')
         this.timeleftEl = this.snackModalEl.querySelector('.timeleft')
 
-        // this._firebase = new Firebase();
+        this.connectFirebase();
         this.initEvents();
     }
 
-    // connectFirebase(){
+    connectFirebase(){
 
-    //     // Your web app's Firebase configuration
-    //     // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-        
-    //     const analytics = getAnalytics(app);
+        // Your web app's Firebase configuration
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        const firebaseConfig = {
+            apiKey: "AIzaSyDlbKFdjog2deG_r2rZZrLosCMSKSVzrhI",
+            authDomain: "dropbox-clone-d266c.firebaseapp.com",
+            databaseURL: "https://dropbox-clone-d266c-default-rtdb.firebaseio.com",
+            projectId: "dropbox-clone-d266c",
+            storageBucket: "dropbox-clone-d266c.appspot.com",
+            messagingSenderId: "1033770015978",
+            appId: "1:1033770015978:web:bfb3072192ad0401728b93",
+            measurementId: "G-PZ7TBMLYEJ"
+        };
+        firebase.initializeApp(firebaseConfig);
           
-    // }
+    }
 
     //iniciando eventos
     initEvents(){
@@ -38,9 +46,8 @@ class DropBoxController {
             this.uploadTask(event.target.files).then(responses  => {
 
                 responses.forEach(resp => {
-                    //console.log(resp);
-                    //this.getFirebaseRef().set(resp.files['input-files']);//Aqui vai salvar os dados do arquivo no firebase
-                    // this.getFirebaseRef(resp);
+                    // console.log(resp);
+                    this.getFirebaseRef().push().set(resp.files['input-file']);//Aqui vai salvar os dados do arquivo no firebase
                 });
 
                 this.modalShow(false);
@@ -56,18 +63,11 @@ class DropBoxController {
     }
 
     //método para salvar no firebase
-    // getFirebaseRef(){
+    getFirebaseRef(){
 
-    //     function writeUserData(files) {
-    //         const db = getDatabase();
-    //         set(ref(db, files['input-files']), {
-                
-    //         });
-    //       }
+        return firebase.database().ref('files');
 
-    //     return writeUserData();
-
-    // }
+    }
 
     //método para esconder o modal
     modalShow(show = true){
