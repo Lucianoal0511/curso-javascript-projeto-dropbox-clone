@@ -3,8 +3,11 @@ class DropBoxController {
 
     constructor (){
 
+        this.currentFolder = ['main'];
+
         this.onSelectionChange = new Event('selectionChange');
 
+        this.navEl = document.querySelector('#browse-location')
         this.btnSendFileEl = document.querySelector('#btn-send-file');
         this.inputFilesEl = document.querySelector('#files');
         this.snackModalEl = document.querySelector('#react-snackbar-root');
@@ -19,7 +22,7 @@ class DropBoxController {
 
         this.connectFirebase();
         this.initEvents();
-        this.readFiles();
+        this.openFolder();
 
     }
 
@@ -71,6 +74,21 @@ class DropBoxController {
 
     //iniciando eventos
     initEvents(){
+
+        //Criando uma pasta
+        this.btnNewFolder.addEventListener('click', e => {
+
+            let name = prompt('Nome da nova pasta:');
+
+            if (name) {
+
+                this.getFirebaseRef().push().set({
+                    name,
+                    type: 'folder',
+                    path:this.currentFolder.join('/')
+                })
+            }
+        })
 
         //Deletar o arquivo
         this.btnDelete.addEventListener('click', e => {
@@ -182,9 +200,11 @@ class DropBoxController {
     }
 
     //método para salvar no firebase
-    getFirebaseRef(){
+    getFirebaseRef(path){
 
-        return firebase.database().ref('files');
+        if (!path) path = this.currentFolder.join('/');
+
+        return firebase.database().ref(path);
 
     }
 
@@ -487,6 +507,8 @@ class DropBoxController {
 
     readFiles(){//Aqui começa a ler os arquivos no Firebase
 
+        this.lasFolder = this.currentFolder.join('/');
+
         this.getFirebaseRef().on('value', snapshot => {
 
             this.listFilesEl.innerHTML = '';//Zera a listagem primeiro
@@ -498,14 +520,99 @@ class DropBoxController {
 
                 //console.log(key, data);
 
-                this.listFilesEl.appendChild(this.getFileView(data, key));
+                if (data.type) {//Aqui a sub pasta desaparece na tela principal, só as pastas da tela que irão aparecer
+
+                    this.listFilesEl.appendChild(this.getFileView(data, key));
+
+                }
 
             });
         });
     }
 
+    //método para abrir a pasta
+    openFolder(){
+
+        //Para entrar na pasta é necessário 'desligar' a pasta anterior
+        if (this.lasFolder) this.getFirebaseRef(this.lasFolder).off('value');
+
+        this.renderNav();
+        this.readFiles();
+
+    }
+
+    //método para rendenrizar as pastas
+    renderNav(){
+
+        let nav = document.createElement('nav');
+        let path = []
+
+        for (let i = 0; i < this.currentFolder.length; i++) {
+
+            let folderName = this.currentFolder[i];//aqui é para saber a pasta atual
+            let span = document.createElement('span');//Cria uma span para o caminho das pastas
+
+            path.push(folderName);//a medida que for caminhando, vamos gravando o nome das pastas para não perder o caminho
+
+            if ((i + 1) === this.currentFolder.length) {//Aqui é para saber se é a última pasta
+
+                span.innerHTML = folderName;
+
+            }else {
+
+                span.className = 'breadcrumb-segment__wrapper'
+                span.innerHTML = `
+                <span class="ue-effect-container uee-BreadCrumbSegment-link-0">
+                    <a href="#" data-path="${path.join('/')}" class="breadcrumb-segment">${folderName}</a>
+                </span>
+                <svg width="24" height="24" viewBox="0 0 24 24" class="mc-icon-template-stateless" style="top: 4px; position: relative;">
+                    <title>arrow-right</title>
+                    <path d="M10.414 7.05l4.95 4.95-4.95 4.95L9 15.534 12.536 12 9 8.464z" fill="#637282" fill-rule="evenodd"></path>
+                </svg>
+                `
+
+            }
+
+            nav.appendChild(span);//mais um nó
+
+        }
+
+        this.navEl.innerHTML = nav.innerHTML;//gravando o conteúdo que está na memória no que está na tela
+
+        //Recuperando o caminho para retornar as pastas anteriores
+        this.navEl.querySelectorAll('a').forEach(a => {
+
+            a.addEventListener('click', e => {
+
+                e.preventDefault();
+
+                this.currentFolder = a.dataset.path.split('/');//Aqui vai transformar a string em um array
+
+                this.openFolder();//Abre a pasta
+
+            });
+        });
+
+    }
+
     //método de clique em cada li da lista
     initEventsLi(li){
+
+        li.addEventListener('dblclick', e => {
+
+            let file = JSON.parse(li.dataset.file);
+
+            switch (file.type) {
+
+                case 'folder':
+                    this.currentFolder.push(file.name);
+                    this.openFolder();
+                    break;
+
+                default:
+                    window.open('/file?path=' + file.path);
+            }
+        })
 
         li.addEventListener('click', e => {
 
