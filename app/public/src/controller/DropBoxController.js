@@ -60,16 +60,118 @@ class DropBoxController {
             let file = JSON.parse(li.dataset.file);//Transforma uma String em um objeto JSON
             let key = li.dataset.key;
 
-            let formData = new FormData();
+            //Aqui era utilizado quando se utiliza o armazenamento no servidor local
+            // let formData = new FormData();
 
-            formData.append('path', file.path);
-            formData.append('key', key);
+            // formData.append('path', file.path);
+            // formData.append('key', key);
 
-            promises.push(this.ajax('/file', 'DELETE', formData));
+            // promises.push(this.ajax('/file', 'DELETE', formData));
+
+            //Para apagar um arquivo no FireStorage
+            promises.push(new Promise((resolve, reject) => {
+
+                //Tratando o método apagar um diretório ou uma pasta
+                if (file.type === 'folder') {
+
+                    this.removeFolderTask(this.currentFolder.join('/'), file.name).then(() => {//Resolve a promessa
+
+                        resolve({
+                            fields:{
+                                key //mesmo que key: key
+                            }
+                        });
+    
+                    });
+
+                } else if (file.type) {//Aqui não precisa especificar o arquivo
+
+                    this.removeFile(this.currentFolder.join('/'), file.name).then(() => {//Resolve a promessa
+
+                        resolve({
+                            fields:{
+                                key //mesmo que key: key
+                            }
+                        });
+    
+                    });
+
+                }
+                
+            }));
 
         });
 
         return Promise.all(promises);
+    }
+
+    //Para apagar uma pasta ou diretório no FireStorage
+    removeFolderTask(ref, name){
+
+        return new Promise((resolve, reject) => {
+
+            let folderRef = this.getFirebaseRef(ref + '/' + name);
+
+            folderRef.on('value', snapshot => {
+
+                folderRef.off('value');//Desliga da pasta que foi deletada e evita executar mais de uma vez
+
+                snapshot.forEach(item => {
+
+                    let data = item.val();
+                    data.key = item.key;
+
+                    if (data.type === 'folder') {
+
+                        this.removeFolderTask(ref + '/' + name, data.name).then(() => {
+
+                            resolve({
+                                fields:{
+                                    key: data.key
+                                }
+                            });
+
+                        }).catch(err => {
+
+                            reject(err);
+
+                        });
+
+                    } else if (data.type) {
+
+                        this.removeFile(ref + '/' + name, data.name).then(() => {
+
+                            resolve({
+                                fields:{
+                                    key: data.key
+                                }
+                            });
+
+                        }).catch(err => {
+
+                            reject(err);
+
+                        });
+
+                    }
+
+                });
+
+                folderRef.remove();
+
+            });
+
+        });
+
+    }
+
+    //Para apagar um arquivo no FireStorage
+    removeFile(ref, name){
+
+        let fileRef = firebase.storage().ref(ref).child(name);
+
+        return fileRef.delete();
+
     }
 
     //iniciando eventos
@@ -166,12 +268,25 @@ class DropBoxController {
             //console.log(event.target.files);
             this.uploadTask(event.target.files).then(responses  => {
 
-                responses.forEach(resp => {
-                    // console.log(resp);
-                    this.getFirebaseRef().push().set(resp.files['input-file']);//Aqui vai salvar os dados do arquivo no firebase
-                });
+                // responses.forEach(resp => {//Isso aqui sai quando utilizamos o Storage do Firebase
+                //     // console.log(resp);
+                //     this.getFirebaseRef().push().set(resp.files['input-file']);//Aqui vai salvar os dados do arquivo no firebase
+                // });
 
                 //this.modalShow(false);
+
+                console.log('responses', responses);
+
+                responses.forEach(resp => {
+
+                    this.getFirebaseRef().push().set({
+                        name: resp.name,
+                        type: resp.contentType,
+                        //path: resp.downloadURLs[0],
+                        size: resp.size
+                    });
+                });
+
                 this.uploadComplete();
 
             }).catch(err => {//se der algum erro no upload
@@ -256,17 +371,56 @@ class DropBoxController {
         //convertendo o file em array (usando spread)
         [...files].forEach(file => {
 
-            let formData = new FormData();
+            //Armazenamento em servidor local
+            // let formData = new FormData();
                 
-            formData.append('input-file', file);
+            // formData.append('input-file', file);
 
-            promises.push(this.ajax('/upload', 'POST', formData, () => {
+            // promises.push(this.ajax('/upload', 'POST', formData, () => {
 
-                this.uploadProgress(event, file);
+            //     this.uploadProgress(event, file);
 
-            }, () => {
+            // }, () => {
 
-                this.startUploadTime = Date.now();//Pegar o tempo exato que iniciou o upload
+            //     this.startUploadTime = Date.now();//Pegar o tempo exato que iniciou o upload
+
+            // }));
+
+            //Utilizando o FireStorage
+            promises.push(new Promise((resolve, reject) => {
+
+                let fileRef = firebase.storage().ref(this.currentFolder.join('/')).child(file.name);//Criando uma referencia para o Storage
+
+                let task = fileRef.put(file);//Iniciando o upload
+
+                task.on('state_changed', snapshot => {//Aqui é o progress
+
+                    this.uploadProgress({
+                        loaded: snapshot.bytesTransferred,
+                        total: snapshot.totalBytes
+                    }, file);
+                    // console.log('progress', snapshot);
+
+                }, error => {//Aqui é o error
+
+                    console.error(error);
+                    reject(error);
+
+                }, () => {//Aqui é o resolve
+
+                    fileRef.getMetadata().then(metadata => {
+
+                        resolve(metadata);
+
+                    }).catch(err => {
+
+                        reject(err);
+
+                    });
+                    
+                    // console.log('success', snapshot);
+
+                });
 
             }));
             
