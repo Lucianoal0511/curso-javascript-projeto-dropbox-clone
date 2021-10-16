@@ -279,11 +279,14 @@ class DropBoxController {
 
                 responses.forEach(resp => {
 
-                    this.getFirebaseRef().push().set({
-                        name: resp.name,
-                        type: resp.contentType,
-                        //path: resp.downloadURLs[0],
-                        size: resp.size
+                    resp.ref.getDownloadURL().then(data => {
+
+                        this.getFirebaseRef().push().set({
+                            name: resp.name,
+                            type: resp.contentType,
+                            path: data,
+                            size: resp.size
+                        });
                     });
                 });
 
@@ -764,7 +767,8 @@ class DropBoxController {
                     break;
 
                 default:
-                    window.open('/file?path=' + file.path);
+                    // window.open('/file?path=' + file.path);//Aqui é utilizando o diretório no servidor local
+                    window.open(file.path);
             }
         })
 
